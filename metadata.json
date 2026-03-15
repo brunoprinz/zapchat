@@ -1,0 +1,7 @@
+{
+  "name": "ZapChat",
+  "description": "Um comunicador instantâneo simples e rápido, sem necessidade de número de celular ou login do Google. Funciona em celulares antigos.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
