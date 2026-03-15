@@ -325,8 +325,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
-const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
-
 
 
   // 2. Coloque a função clearChat aqui dentro
@@ -350,7 +348,7 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
     socketRef.current = newSocket; // Aqui conectamos a lixeira ao socket real
 
     newSocket.on('connect', () => {
-      newSocket.emit('join', { username, avatar });
+      newsocketRef.current?.emit('join', { username, avatar });
     });
 
     newSocket.on('history', (history: Message[]) => {
@@ -358,7 +356,7 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
       if (document.hasFocus()) {
         history.forEach(m => {
           if (m.type === 'user' && m.username !== username) {
-            newSocket.emit('readMessage', m.id);
+            newsocketRef.current?.emit('readMessage', m.id);
           }
         });
       }
@@ -376,7 +374,7 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
       setMessages((prev) => [...prev, message]);
       if (message.username !== username) {
         if (document.hasFocus()) {
-          newSocket.emit('readMessage', message.id);
+          newsocketRef.current?.emit('readMessage', message.id);
         }
         playNotificationSound('message');
       }
@@ -411,7 +409,7 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
       if (socket && isJoined) {
         messages.forEach(m => {
           if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
-            socket.emit('readMessage', m.id);
+            socketRef.current?.emit('readMessage', m.id);
             readMessagesRef.current.add(m.id);
           }
         });
@@ -432,16 +430,20 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleDeleteMessage = (messageId: string) => {
-    if (socket) {
-      socket.emit('deleteMessage', messageId);
-    }
+  const handleDeleteMessage = (id: string) => {
+
+    // Trocamos 'socket' por 'socketRef.current'
+
+    socketRef.current?.emit('deleteMessage', id);
+
   };
 
-  const handleEditMessage = (messageId: string, newText: string) => {
-    if (socket) {
-      socket.emit('editMessage', { id: messageId, text: newText });
-    }
+  const handleEditMessage = (id: string, newText: string) => {
+
+    // Trocamos 'socket' por 'socketRef.current'
+
+    socketRef.current?.emit('editMessage', { id, text: newText });
+
   };
 
   const handleJoin = (e: React.FormEvent) => {
@@ -466,22 +468,24 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputText(e.target.value);
     
-    if (socket) {
+    // Verificamos se o socket existe e se o usuário já entrou no chat
+    if (socketRef.current && isJoined) {
       if (e.target.value.trim() !== '') {
-        socket.emit('typing');
+        socketRef.current.emit('typing', username);
         
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
         }
         
         typingTimeoutRef.current = setTimeout(() => {
-          socket.emit('stopTyping');
+          socketRef.current?.emit('stopTyping', username);
         }, 2000);
       } else {
-        socket.emit('stopTyping');
+        // Se o campo ficar vazio, avisa para parar de digitar imediatamente
+        socketRef.current.emit('stopTyping', username);
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
         }
@@ -491,7 +495,8 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!inputText.trim() && !selectedFile) || !socket) return;
+    // Mudamos 'socket' para 'socketRef.current'
+    if ((!inputText.trim() && !selectedFile) || !socketRef.current) return;
 
     const payload = {
       text: inputText.trim(),
@@ -503,8 +508,8 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
       } : undefined
     };
 
-    socket.emit('message', payload);
-    socket.emit('stopTyping');
+    socketRef.current.emit('message', payload);
+    socketRef.current.emit('stopTyping', username);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setInputText('');
     setSelectedFile(null);
@@ -557,11 +562,64 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
     }
   };
 
-  const stopRecording = () => {
+const stopRecording = () => {
+
     if (mediaRecorderRef.current && isRecording) {
+
       mediaRecorderRef.current.stop();
+
       setIsRecording(false);
+
+
+      
+      mediaRecorderRef.current.ondataavailable = (e) => {
+
+        audioChunksRef.current.push(e.data);
+
+      };
+
+
+
+      mediaRecorderRef.current.onstop = async () => {
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        const reader = new FileReader();
+
+        reader.readAsDataURL(audioBlob);
+
+        reader.onloadend = () => {
+
+          const base64Audio = reader.result as string;
+
+          // CORREÇÃO: Usando socketRef.current
+
+          socketRef.current?.emit('message', {
+
+            text: '🎤 Áudio',
+
+            file: {
+
+              name: `audio_${Date.now()}.webm`,
+
+              type: 'audio/webm',
+
+              data: base64Audio,
+
+              size: audioBlob.size
+
+            }
+
+          });
+
+        };
+
+        audioChunksRef.current = [];
+
+      };
+
     }
+
   };
 
   const cancelRecording = () => {
@@ -576,7 +634,7 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
 
   const handleLogout = () => {
     if (socket) {
-      socket.emit('stopTyping');
+      socketRef.current?.emit('stopTyping');
       socket.disconnect();
     }
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
