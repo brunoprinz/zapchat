@@ -53,19 +53,6 @@ const initAudio = () => {
 };
 
 
-// Adicione esta função dentro do seu componente App
-
-
-
-const clearChat = () => {
-  const password = window.prompt("Digite a senha de admin:");
-  if (password) {
-    // É essencial enviar o objeto { password } para o servidor validar
-    socketRef.current?.emit("clear_all_messages", { password });
-  }
-};
-
-
 const themes = {
   emerald: {
     bg: 'bg-emerald-600',
@@ -337,6 +324,23 @@ export default function App() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
+
+
+  // 2. Coloque a função clearChat aqui dentro
+
+  const clearChat = () => {
+
+    const password = window.prompt("Digite a senha de admin:");
+
+    if (password) {
+
+      socketRef.current?.emit("clear_all_messages", { password });
+
+    }
+
+  };
 
   useEffect(() => {
     if (!isJoined || !username) return;
