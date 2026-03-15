@@ -45,27 +45,12 @@ async function startServer() {
         username: username,
         text: `${username} entrou no chat.`,
         timestamp: Date.now()
-      // No server.ts
-socket.on("clear_all_messages", (data: { password: string }) => {
-
-  const ADMIN_PASSWORD = "Wyz13ab*"; // Altere para sua senha real
-
-  
-  if (data.password === ADMIN_PASSWORD) {
-
-    messages.length = 0; // Limpa o array mantendo a referência
-
-    io.emit("messages_cleared");
-
-    console.log("Histórico de mensagens apagado por admin.");
-
-  } else {
-
-    socket.emit("error_notification", "Senha incorreta!");
-
-  }
-
-}); // <-- Certifique-se de que termina com });
+      socket.on("clear_all_messages", () => {
+  messages.length = 0; // Isso esvazia o array mantendo a mesma referência
+  io.emit("messages_cleared"); // Avisa todos os usuários para limparem a tela
+  console.log("O histórico de mensagens foi zerado.");
+});
+    });
 
     socket.on("message", (data: { text: string, file?: any }) => {
       const user = users.get(socket.id);

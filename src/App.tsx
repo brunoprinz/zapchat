@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -51,6 +51,20 @@ const initAudio = () => {
     audioCtx.resume();
   }
 };
+
+
+// Adicione esta função dentro do seu componente App
+
+
+
+const clearChat = () => {
+  const password = window.prompt("Digite a senha de admin:");
+  if (password) {
+    // É essencial enviar o objeto { password } para o servidor validar
+    socketRef.current?.emit("clear_all_messages", { password });
+  }
+};
+
 
 const themes = {
   emerald: {
@@ -350,9 +364,16 @@ export default function App() {
             newSocket.emit('readMessage', m.id);
             readMessagesRef.current.add(m.id);
           }
-        });
+        // Adicione isto junto com os outros socketRef.current.on(...)
+socketRef.current.on("messages_cleared", () => {
+  setMessages([]); // Limpa a lista na tela de quem estiver logado
+});
+
+// Opcional: para mostrar o erro de senha
+socketRef.current.on("error_notification", (msg: string) => {
+  alert(msg);
+});
       }
-    });
 
     newSocket.on('message', (message: Message) => {
       const messageWithFlag = { ...message, isNewLocal: true };
@@ -754,8 +775,22 @@ export default function App() {
             >
               <LogOut className="h-5 w-5" />
             </button>
+
           </div>
         </div>
+
+
+{/* Exemplo de onde colocar no App.tsx */}
+<div className="flex items-center gap-2">
+  <button
+    onClick={clearChat}
+    className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors"
+    title="Limpar mensagens"
+  >
+    <Trash2 className="h-5 w-5" />
+  </button>
+  {/* ... botão de usuários que já existe ... */}
+</div>
         
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xl shadow-sm">
