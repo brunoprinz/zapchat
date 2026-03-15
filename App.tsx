@@ -369,10 +369,12 @@ export default function App() {
             readMessagesRef.current.add(m.id);
 
           }
-        
-}); // <-- ESSE FECHAMENTO AQUI É O QUE FALTAVA (fecha o forEach)
-      
-} // <-- ESSE FECHAMENTO AQUI FECHA O if (document.hasFocus)
+
+        });
+
+      }
+    
+}); // <--- O ERRO ESTAVA AQUI! Faltava esse }); para fechar o 'history'
 
 // AGORA SIM, FORA DAS OUTRAS CAIXAS, VOCÊ COLOCA OS NOVOS:
 
