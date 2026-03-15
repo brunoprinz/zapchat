@@ -328,6 +328,7 @@ export default function App() {
 const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
 
 
+
   // 2. Coloque a função clearChat aqui dentro
 
   const clearChat = () => {
@@ -346,31 +347,23 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
     if (!isJoined || !username) return;
 
     const newSocket = io(window.location.origin);
-    
+    socketRef.current = newSocket; // Aqui conectamos a lixeira ao socket real
+
     newSocket.on('connect', () => {
       newSocket.emit('join', { username, avatar });
     });
 
     newSocket.on('history', (history: Message[]) => {
       setMessages(history);
-      if (history.length > 0) {
-        const lastUserMsg = [...history].reverse().find(m => m.type === 'user');
-        if (lastUserMsg) {
-          lastMessageTimeRef.current = lastUserMsg.timestamp;
-        }
-      }
-      
       if (document.hasFocus()) {
         history.forEach(m => {
-          if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
+          if (m.type === 'user' && m.username !== username) {
             newSocket.emit('readMessage', m.id);
-            readMessagesRef.current.add(m.id);
           }
         });
       }
     });
 
-    // Eventos de Limpeza (Senha: Bruno)
     newSocket.on("messages_cleared", () => {
       setMessages([]);
     });
@@ -380,44 +373,18 @@ const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
     });
 
     newSocket.on('message', (message: Message) => {
-      const messageWithFlag = { ...message, isNewLocal: true };
-      setMessages((prev) => [...prev, messageWithFlag]);
-      
-      if (message.type === 'user' && message.userId !== newSocket.id) {
-        playNotificationSound(); 
+      setMessages((prev) => [...prev, message]);
+      if (message.username !== username) {
+        if (document.hasFocus()) {
+          newSocket.emit('readMessage', message.id);
+        }
+        playNotificationSound('message');
       }
     });
 
     newSocket.on('users', (users: OnlineUser[]) => {
       setOnlineUsers(users);
     });
-
-    newSocket.on('typing', (typingUsername: string) => {
-      setTypingUsers((prev) => {
-        if (!prev.includes(typingUsername)) return [...prev, typingUsername];
-        return prev;
-      });
-    });
-
-    newSocket.on('stopTyping', (typingUsername: string) => {
-      setTypingUsers((prev) => prev.filter((u) => u !== typingUsername));
-    });
-
-    newSocket.on('messageRead', ({ messageId, userId }: { messageId: string, userId: string }) => {
-      setMessages((prev) =>
-        prev.map((msg) => {
-          if (msg.id === messageId) {
-            const readBy = msg.readBy || [];
-            if (!readBy.includes(userId)) {
-              return { ...msg, readBy: [...readBy, userId] };
-            }
-          }
-          return msg;
-        })
-      );
-    });
-
-    socketRef.current = newSocket;
 
     return () => {
       newSocket.disconnect();
