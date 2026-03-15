@@ -52,6 +52,7 @@ const initAudio = () => {
   }
 };
 
+
 const themes = {
   emerald: {
     bg: 'bg-emerald-600',
@@ -316,7 +317,6 @@ export default function App() {
   const audioChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<Socket | null>(null);
   const lastMessageTimeRef = useRef<number>(Date.now());
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const readMessagesRef = useRef<Set<string>>(new Set());
@@ -326,7 +326,10 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
 
 
-const clearChat = () => {
+
+  // 2. Coloque a função clearChat aqui dentro
+
+  const clearChat = () => {
 
     const password = window.prompt("Digite a senha de admin:");
 
@@ -339,34 +342,21 @@ const clearChat = () => {
   };
 
   useEffect(() => {
-    // Only connect when user joins
     if (!isJoined || !username) return;
 
-    // Use the current origin for the socket connection
     const newSocket = io(window.location.origin);
-    
-    // Conectamos o "cofre" da lixeira e o "socket" original à nova conexão
-    socketRef.current = newSocket;
-    setSocket(newSocket);
-    
+    socketRef.current = newSocket; // Aqui conectamos a lixeira ao socket real
+
     newSocket.on('connect', () => {
-      newSocket.emit('join', { username, avatar });
+      newsocketRef.current?.emit('join', { username, avatar });
     });
 
     newSocket.on('history', (history: Message[]) => {
       setMessages(history);
-      if (history.length > 0) {
-        const lastUserMsg = [...history].reverse().find(m => m.type === 'user');
-        if (lastUserMsg) {
-          lastMessageTimeRef.current = lastUserMsg.timestamp;
-        }
-      }
-      
       if (document.hasFocus()) {
         history.forEach(m => {
-          if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
-            newSocket.emit('readMessage', m.id);
-            readMessagesRef.current.add(m.id);
+          if (m.type === 'user' && m.username !== username) {
+            newsocketRef.current?.emit('readMessage', m.id);
           }
         });
       }
@@ -381,30 +371,12 @@ const clearChat = () => {
     });
 
     newSocket.on('message', (message: Message) => {
-      const messageWithFlag = { ...message, isNewLocal: true };
-      setMessages((prev) => [...prev, messageWithFlag]);
-      
-      const isMe = message.username === username;
-      
-      if (!isMe) {
+      setMessages((prev) => [...prev, message]);
+      if (message.username !== username) {
         if (document.hasFocus()) {
-          newSocket.emit('readMessage', message.id);
-          readMessagesRef.current.add(message.id);
+          newsocketRef.current?.emit('readMessage', message.id);
         }
-        if (message.type === 'system' && message.action === 'join') {
-          playSound('join');
-        } else if (message.type === 'user') {
-          const now = Date.now();
-          const timeSinceLastMsg = now - lastMessageTimeRef.current;
-          // 5 minutes = 300000 ms
-          if (timeSinceLastMsg >= 300000) {
-            playSound('message');
-          }
-        }
-      }
-      
-      if (message.type === 'user') {
-        lastMessageTimeRef.current = Date.now();
+        playNotificationSound('message');
       }
     });
 
@@ -412,45 +384,10 @@ const clearChat = () => {
       setOnlineUsers(users);
     });
 
-    newSocket.on('typing', (typingUsername: string) => {
-      setTypingUsers((prev) => {
-        if (!prev.includes(typingUsername)) {
-          return [...prev, typingUsername];
-        }
-        return prev;
-      });
-    });
-
-    newSocket.on('stopTyping', (typingUsername: string) => {
-      setTypingUsers((prev) => prev.filter(u => u !== typingUsername));
-    });
-
-    newSocket.on('messageDeleted', (messageId: string) => {
-      setMessages((prev) => prev.filter(m => m.id !== messageId));
-    });
-
-    newSocket.on('messageEdited', (data: { id: string, text: string }) => {
-      setMessages((prev) => prev.map(m => m.id === data.id ? { ...m, text: data.text, isEdited: true } : m));
-    });
-
-    newSocket.on('messageRead', ({ messageId, userId }: { messageId: string, userId: string }) => {
-      setMessages((prev) => prev.map(m => {
-        if (m.id === messageId) {
-          const readBy = m.readBy || [];
-          if (!readBy.includes(userId)) {
-            return { ...m, readBy: [...readBy, userId] };
-          }
-        }
-        return m;
-      }));
-    });
-
-    setSocket(newSocket);
-
     return () => {
       newSocket.disconnect();
     };
-  }, [isJoined, username]);
+  }, [isJoined, username, avatar]);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -472,7 +409,7 @@ const clearChat = () => {
       if (socket && isJoined) {
         messages.forEach(m => {
           if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
-            socket.emit('readMessage', m.id);
+            socketRef.current?.emit('readMessage', m.id);
             readMessagesRef.current.add(m.id);
           }
         });
@@ -493,16 +430,20 @@ const clearChat = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleDeleteMessage = (messageId: string) => {
-    if (socket) {
-      socket.emit('deleteMessage', messageId);
-    }
+  const handleDeleteMessage = (id: string) => {
+
+    // Trocamos 'socket' por 'socketRef.current'
+
+    socketRef.current?.emit('deleteMessage', id);
+
   };
 
-  const handleEditMessage = (messageId: string, newText: string) => {
-    if (socket) {
-      socket.emit('editMessage', { id: messageId, text: newText });
-    }
+  const handleEditMessage = (id: string, newText: string) => {
+
+    // Trocamos 'socket' por 'socketRef.current'
+
+    socketRef.current?.emit('editMessage', { id, text: newText });
+
   };
 
   const handleJoin = (e: React.FormEvent) => {
@@ -527,22 +468,24 @@ const clearChat = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputText(e.target.value);
     
-    if (socket) {
+    // Verificamos se o socket existe e se o usuário já entrou no chat
+    if (socketRef.current && isJoined) {
       if (e.target.value.trim() !== '') {
-        socket.emit('typing');
+        socketRef.current.emit('typing', username);
         
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
         }
         
         typingTimeoutRef.current = setTimeout(() => {
-          socket.emit('stopTyping');
+          socketRef.current?.emit('stopTyping', username);
         }, 2000);
       } else {
-        socket.emit('stopTyping');
+        // Se o campo ficar vazio, avisa para parar de digitar imediatamente
+        socketRef.current.emit('stopTyping', username);
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
         }
@@ -552,7 +495,8 @@ const clearChat = () => {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!inputText.trim() && !selectedFile) || !socket) return;
+    // Mudamos 'socket' para 'socketRef.current'
+    if ((!inputText.trim() && !selectedFile) || !socketRef.current) return;
 
     const payload = {
       text: inputText.trim(),
@@ -564,8 +508,8 @@ const clearChat = () => {
       } : undefined
     };
 
-    socket.emit('message', payload);
-    socket.emit('stopTyping');
+    socketRef.current.emit('message', payload);
+    socketRef.current.emit('stopTyping', username);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setInputText('');
     setSelectedFile(null);
@@ -618,11 +562,64 @@ const clearChat = () => {
     }
   };
 
-  const stopRecording = () => {
+const stopRecording = () => {
+
     if (mediaRecorderRef.current && isRecording) {
+
       mediaRecorderRef.current.stop();
+
       setIsRecording(false);
+
+
+      
+      mediaRecorderRef.current.ondataavailable = (e) => {
+
+        audioChunksRef.current.push(e.data);
+
+      };
+
+
+
+      mediaRecorderRef.current.onstop = async () => {
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        const reader = new FileReader();
+
+        reader.readAsDataURL(audioBlob);
+
+        reader.onloadend = () => {
+
+          const base64Audio = reader.result as string;
+
+          // CORREÇÃO: Usando socketRef.current
+
+          socketRef.current?.emit('message', {
+
+            text: '🎤 Áudio',
+
+            file: {
+
+              name: `audio_${Date.now()}.webm`,
+
+              type: 'audio/webm',
+
+              data: base64Audio,
+
+              size: audioBlob.size
+
+            }
+
+          });
+
+        };
+
+        audioChunksRef.current = [];
+
+      };
+
     }
+
   };
 
   const cancelRecording = () => {
@@ -637,7 +634,7 @@ const clearChat = () => {
 
   const handleLogout = () => {
     if (socket) {
-      socket.emit('stopTyping');
+      socketRef.current?.emit('stopTyping');
       socket.disconnect();
     }
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -773,14 +770,6 @@ const clearChat = () => {
             ZapChat
           </h2>
           <div className="flex items-center gap-1">
-            {/* Botão da Lixeira */}
-            <button
-              onClick={clearChat}
-              className="p-2 text-slate-400 hover:text-red-500 transition-colors mr-2"
-              title="Limpar todas as mensagens"
-            >
-              <Trash2 className="h-5 w-5" />
-            </button>
             <button 
               onClick={handleLogout}
               className={`p-2 ${themes[theme].hover} rounded-full transition-colors`}
@@ -788,8 +777,22 @@ const clearChat = () => {
             >
               <LogOut className="h-5 w-5" />
             </button>
+
           </div>
         </div>
+
+
+{/* Exemplo de onde colocar no App.tsx */}
+<div className="flex items-center gap-2">
+  <button
+    onClick={clearChat}
+    className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors"
+    title="Limpar mensagens"
+  >
+    <Trash2 className="h-5 w-5" />
+  </button>
+  {/* ... botão de usuários que já existe ... */}
+</div>
         
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xl shadow-sm">

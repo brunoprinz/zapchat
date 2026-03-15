@@ -52,6 +52,20 @@ const initAudio = () => {
   }
 };
 
+
+// Adicione esta função dentro do seu componente App
+
+
+
+const clearChat = () => {
+  const password = window.prompt("Digite a senha de admin:");
+  if (password) {
+    // É essencial enviar o objeto { password } para o servidor validar
+    socketRef.current?.emit("clear_all_messages", { password });
+  }
+};
+
+
 const themes = {
   emerald: {
     bg: 'bg-emerald-600',
@@ -316,7 +330,6 @@ export default function App() {
   const audioChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<Socket | null>(null);
   const lastMessageTimeRef = useRef<number>(Date.now());
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const readMessagesRef = useRef<Set<string>>(new Set());
@@ -325,29 +338,12 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
-
-const clearChat = () => {
-
-    const password = window.prompt("Digite a senha de admin:");
-
-    if (password) {
-
-      socketRef.current?.emit("clear_all_messages", { password });
-
-    }
-
-  };
-
   useEffect(() => {
     // Only connect when user joins
     if (!isJoined || !username) return;
 
     // Use the current origin for the socket connection
     const newSocket = io(window.location.origin);
-    
-    // Conectamos o "cofre" da lixeira e o "socket" original à nova conexão
-    socketRef.current = newSocket;
-    setSocket(newSocket);
     
     newSocket.on('connect', () => {
       newSocket.emit('join', { username, avatar });
@@ -363,22 +359,37 @@ const clearChat = () => {
       }
       
       if (document.hasFocus()) {
+
         history.forEach(m => {
+
           if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
+
             newSocket.emit('readMessage', m.id);
+
             readMessagesRef.current.add(m.id);
+
           }
+
         });
+
       }
-    });
+    
+}); // <--- O ERRO ESTAVA AQUI! Faltava esse }); para fechar o 'history'
 
-    newSocket.on("messages_cleared", () => {
-      setMessages([]);
-    });
+// AGORA SIM, FORA DAS OUTRAS CAIXAS, VOCÊ COLOCA OS NOVOS:
 
-    newSocket.on("error_notification", (msg: string) => {
-      alert(msg);
-    });
+      newSocket.on("messages_cleared", () => {
+
+        setMessages([]);
+
+      });
+
+
+      newSocket.on("error_notification", (msg: string) => {
+
+        alert(msg);
+
+      });
 
     newSocket.on('message', (message: Message) => {
       const messageWithFlag = { ...message, isNewLocal: true };
@@ -773,14 +784,6 @@ const clearChat = () => {
             ZapChat
           </h2>
           <div className="flex items-center gap-1">
-            {/* Botão da Lixeira */}
-            <button
-              onClick={clearChat}
-              className="p-2 text-slate-400 hover:text-red-500 transition-colors mr-2"
-              title="Limpar todas as mensagens"
-            >
-              <Trash2 className="h-5 w-5" />
-            </button>
             <button 
               onClick={handleLogout}
               className={`p-2 ${themes[theme].hover} rounded-full transition-colors`}
@@ -788,8 +791,22 @@ const clearChat = () => {
             >
               <LogOut className="h-5 w-5" />
             </button>
+
           </div>
         </div>
+
+
+{/* Exemplo de onde colocar no App.tsx */}
+<div className="flex items-center gap-2">
+  <button
+    onClick={clearChat}
+    className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors"
+    title="Limpar mensagens"
+  >
+    <Trash2 className="h-5 w-5" />
+  </button>
+  {/* ... botão de usuários que já existe ... */}
+</div>
         
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xl shadow-sm">

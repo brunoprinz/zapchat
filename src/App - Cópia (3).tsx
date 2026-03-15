@@ -52,6 +52,7 @@ const initAudio = () => {
   }
 };
 
+
 const themes = {
   emerald: {
     bg: 'bg-emerald-600',
@@ -316,7 +317,6 @@ export default function App() {
   const audioChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<Socket | null>(null);
   const lastMessageTimeRef = useRef<number>(Date.now());
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const readMessagesRef = useRef<Set<string>>(new Set());
@@ -325,8 +325,12 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
+const socketRef = useRef<Socket | null>(null); // ESSA LINHA É ESSENCIAL
 
-const clearChat = () => {
+
+  // 2. Coloque a função clearChat aqui dentro
+
+  const clearChat = () => {
 
     const password = window.prompt("Digite a senha de admin:");
 
@@ -339,15 +343,9 @@ const clearChat = () => {
   };
 
   useEffect(() => {
-    // Only connect when user joins
     if (!isJoined || !username) return;
 
-    // Use the current origin for the socket connection
     const newSocket = io(window.location.origin);
-    
-    // Conectamos o "cofre" da lixeira e o "socket" original à nova conexão
-    socketRef.current = newSocket;
-    setSocket(newSocket);
     
     newSocket.on('connect', () => {
       newSocket.emit('join', { username, avatar });
@@ -372,6 +370,7 @@ const clearChat = () => {
       }
     });
 
+    // Eventos de Limpeza (Senha: Bruno)
     newSocket.on("messages_cleared", () => {
       setMessages([]);
     });
@@ -384,27 +383,8 @@ const clearChat = () => {
       const messageWithFlag = { ...message, isNewLocal: true };
       setMessages((prev) => [...prev, messageWithFlag]);
       
-      const isMe = message.username === username;
-      
-      if (!isMe) {
-        if (document.hasFocus()) {
-          newSocket.emit('readMessage', message.id);
-          readMessagesRef.current.add(message.id);
-        }
-        if (message.type === 'system' && message.action === 'join') {
-          playSound('join');
-        } else if (message.type === 'user') {
-          const now = Date.now();
-          const timeSinceLastMsg = now - lastMessageTimeRef.current;
-          // 5 minutes = 300000 ms
-          if (timeSinceLastMsg >= 300000) {
-            playSound('message');
-          }
-        }
-      }
-      
-      if (message.type === 'user') {
-        lastMessageTimeRef.current = Date.now();
+      if (message.type === 'user' && message.userId !== newSocket.id) {
+        playNotificationSound(); 
       }
     });
 
@@ -414,43 +394,35 @@ const clearChat = () => {
 
     newSocket.on('typing', (typingUsername: string) => {
       setTypingUsers((prev) => {
-        if (!prev.includes(typingUsername)) {
-          return [...prev, typingUsername];
-        }
+        if (!prev.includes(typingUsername)) return [...prev, typingUsername];
         return prev;
       });
     });
 
     newSocket.on('stopTyping', (typingUsername: string) => {
-      setTypingUsers((prev) => prev.filter(u => u !== typingUsername));
-    });
-
-    newSocket.on('messageDeleted', (messageId: string) => {
-      setMessages((prev) => prev.filter(m => m.id !== messageId));
-    });
-
-    newSocket.on('messageEdited', (data: { id: string, text: string }) => {
-      setMessages((prev) => prev.map(m => m.id === data.id ? { ...m, text: data.text, isEdited: true } : m));
+      setTypingUsers((prev) => prev.filter((u) => u !== typingUsername));
     });
 
     newSocket.on('messageRead', ({ messageId, userId }: { messageId: string, userId: string }) => {
-      setMessages((prev) => prev.map(m => {
-        if (m.id === messageId) {
-          const readBy = m.readBy || [];
-          if (!readBy.includes(userId)) {
-            return { ...m, readBy: [...readBy, userId] };
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === messageId) {
+            const readBy = msg.readBy || [];
+            if (!readBy.includes(userId)) {
+              return { ...msg, readBy: [...readBy, userId] };
+            }
           }
-        }
-        return m;
-      }));
+          return msg;
+        })
+      );
     });
 
-    setSocket(newSocket);
+    socketRef.current = newSocket;
 
     return () => {
       newSocket.disconnect();
     };
-  }, [isJoined, username]);
+  }, [isJoined, username, avatar]);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -773,14 +745,6 @@ const clearChat = () => {
             ZapChat
           </h2>
           <div className="flex items-center gap-1">
-            {/* Botão da Lixeira */}
-            <button
-              onClick={clearChat}
-              className="p-2 text-slate-400 hover:text-red-500 transition-colors mr-2"
-              title="Limpar todas as mensagens"
-            >
-              <Trash2 className="h-5 w-5" />
-            </button>
             <button 
               onClick={handleLogout}
               className={`p-2 ${themes[theme].hover} rounded-full transition-colors`}
@@ -788,8 +752,22 @@ const clearChat = () => {
             >
               <LogOut className="h-5 w-5" />
             </button>
+
           </div>
         </div>
+
+
+{/* Exemplo de onde colocar no App.tsx */}
+<div className="flex items-center gap-2">
+  <button
+    onClick={clearChat}
+    className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors"
+    title="Limpar mensagens"
+  >
+    <Trash2 className="h-5 w-5" />
+  </button>
+  {/* ... botão de usuários que já existe ... */}
+</div>
         
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xl shadow-sm">

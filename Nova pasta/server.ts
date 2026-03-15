@@ -28,6 +28,7 @@ async function startServer() {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    // 1. LÓGICA DE ENTRADA (JOIN)
     socket.on("join", (data: { username: string, avatar: string } | string) => {
       const username = typeof data === 'string' ? data : data.username;
       const avatar = typeof data === 'string' ? '' : data.avatar;
@@ -35,8 +36,7 @@ async function startServer() {
       users.set(socket.id, { id: socket.id, username, avatar, lastSeen: Date.now() });
       io.emit("users", Array.from(users.values()));
       
-      // Send message history to the new user
-      socket.emit("history", messages.slice(-50)); // Send last 50 messages
+      socket.emit("history", messages.slice(-50));
       
       io.emit("message", {
         id: Date.now().toString(),
@@ -45,23 +45,22 @@ async function startServer() {
         username: username,
         text: `${username} entrou no chat.`,
         timestamp: Date.now()
-      socket.on("clear_all_messages", () => {
-  messages.length = 0; // Isso esvazia o array mantendo a mesma referência
-  io.emit("messages_cleared"); // Avisa todos os usuários para limparem a tela
-  console.log("O histórico de mensagens foi zerado.");
-});
-    });
+      });
+    }); // <-- AQUI TERMINA O JOIN
 
-
-    socket.on("clear_all_messages", (data: { password?: string }) => {
-      if (data.password === "1234") { 
+    // 2. LÓGICA DA LIXEIRA (LIMPAR TUDO)
+    socket.on("clear_all_messages", (data: { password: string }) => {
+      const ADMIN_PASSWORD = "Bruno"; // Você pode mudar para sua senha Wyz... se preferir
+      if (data.password === ADMIN_PASSWORD) {
         messages.length = 0; 
         io.emit("messages_cleared");
+        console.log("Histórico apagado por admin.");
       } else {
         socket.emit("error_notification", "Senha incorreta!");
       }
-    });
+    }); // <-- AQUI TERMINA A LIXEIRA
 
+    // 3. LÓGICA DE MENSAGENS COMUM
     socket.on("message", (data: { text: string, file?: any }) => {
       const user = users.get(socket.id);
       if (user) {
@@ -76,12 +75,10 @@ async function startServer() {
           timestamp: Date.now()
         };
         messages.push(message);
-        // Keep only last 100 messages in memory
         if (messages.length > 100) messages.shift();
         io.emit("message", message);
       }
     });
-
     socket.on("typing", () => {
       const user = users.get(socket.id);
       if (user) {
