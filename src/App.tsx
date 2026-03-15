@@ -359,21 +359,37 @@ export default function App() {
       }
       
       if (document.hasFocus()) {
-        history.forEach(m => {
-          if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
-            newSocket.emit('readMessage', m.id);
-            readMessagesRef.current.add(m.id);
-          }
-        // Adicione isto junto com os outros socketRef.current.on(...)
-socketRef.current.on("messages_cleared", () => {
-  setMessages([]); // Limpa a lista na tela de quem estiver logado
-});
 
-// Opcional: para mostrar o erro de senha
-socketRef.current.on("error_notification", (msg: string) => {
-  alert(msg);
-});
+        history.forEach(m => {
+
+          if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
+
+            newSocket.emit('readMessage', m.id);
+
+            readMessagesRef.current.add(m.id);
+
+          }
+
+        });
+
       }
+    
+}); // <--- O ERRO ESTAVA AQUI! Faltava esse }); para fechar o 'history'
+
+// AGORA SIM, FORA DAS OUTRAS CAIXAS, VOCÊ COLOCA OS NOVOS:
+
+      newSocket.on("messages_cleared", () => {
+
+        setMessages([]);
+
+      });
+
+
+      newSocket.on("error_notification", (msg: string) => {
+
+        alert(msg);
+
+      });
 
     newSocket.on('message', (message: Message) => {
       const messageWithFlag = { ...message, isNewLocal: true };
