@@ -28,6 +28,7 @@ async function startServer() {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    // 1. Lógica de entrada no chat (JOIN)
     socket.on("join", (data: { username: string, avatar: string } | string) => {
       const username = typeof data === 'string' ? data : data.username;
       const avatar = typeof data === 'string' ? '' : data.avatar;
@@ -35,8 +36,7 @@ async function startServer() {
       users.set(socket.id, { id: socket.id, username, avatar, lastSeen: Date.now() });
       io.emit("users", Array.from(users.values()));
       
-      // Send message history to the new user
-      socket.emit("history", messages.slice(-50)); // Send last 50 messages
+      socket.emit("history", messages.slice(-50));
       
       io.emit("message", {
         id: Date.now().toString(),
@@ -45,28 +45,22 @@ async function startServer() {
         username: username,
         text: `${username} entrou no chat.`,
         timestamp: Date.now()
-      // No server.ts
-socket.on("clear_all_messages", (data: { password: string }) => {
+      });
+    }); // <-- FECHAMENTO IMPORTANTE AQUI!
 
-  const ADMIN_PASSWORD = "Wyz13ab*"; // Altere para sua senha real
+    // 2. Lógica para apagar mensagens (Fica independente aqui dentro)
+    socket.on("clear_all_messages", (data: { password: string }) => {
+      const ADMIN_PASSWORD = "Bruno"; // Defina sua senha aqui
+      if (data.password === ADMIN_PASSWORD) {
+        messages.length = 0; 
+        io.emit("messages_cleared");
+        console.log("Histórico apagado por admin.");
+      } else {
+        socket.emit("error_notification", "Senha incorreta!");
+      }
+    });
 
-  
-  if (data.password === ADMIN_PASSWORD) {
-
-    messages.length = 0; // Limpa o array mantendo a referência
-
-    io.emit("messages_cleared");
-
-    console.log("Histórico de mensagens apagado por admin.");
-
-  } else {
-
-    socket.emit("error_notification", "Senha incorreta!");
-
-  }
-
-}); // <-- Certifique-se de que termina com });
-
+    // 3. Lógica de envio de mensagens comum
     socket.on("message", (data: { text: string, file?: any }) => {
       const user = users.get(socket.id);
       if (user) {
@@ -81,12 +75,10 @@ socket.on("clear_all_messages", (data: { password: string }) => {
           timestamp: Date.now()
         };
         messages.push(message);
-        // Keep only last 100 messages in memory
         if (messages.length > 100) messages.shift();
         io.emit("message", message);
       }
     });
-
     socket.on("typing", () => {
       const user = users.get(socket.id);
       if (user) {
