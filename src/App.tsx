@@ -339,10 +339,8 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
-    // Only connect when user joins
     if (!isJoined || !username) return;
 
-    // Use the current origin for the socket connection
     const newSocket = io(window.location.origin);
     
     newSocket.on('connect', () => {
@@ -359,63 +357,30 @@ export default function App() {
       }
       
       if (document.hasFocus()) {
-
         history.forEach(m => {
-
           if (m.type === 'user' && m.username !== username && !readMessagesRef.current.has(m.id)) {
-
             newSocket.emit('readMessage', m.id);
-
             readMessagesRef.current.add(m.id);
-
           }
-
         });
-
       }
-    
-}); // <--- O ERRO ESTAVA AQUI! Faltava esse }); para fechar o 'history'
+    });
 
-// AGORA SIM, FORA DAS OUTRAS CAIXAS, VOCÊ COLOCA OS NOVOS:
+    // Eventos de Limpeza (Senha: Bruno)
+    newSocket.on("messages_cleared", () => {
+      setMessages([]);
+    });
 
-      newSocket.on("messages_cleared", () => {
-
-        setMessages([]);
-
-      });
-
-
-      newSocket.on("error_notification", (msg: string) => {
-
-        alert(msg);
-
-      });
+    newSocket.on("error_notification", (msg: string) => {
+      alert(msg);
+    });
 
     newSocket.on('message', (message: Message) => {
       const messageWithFlag = { ...message, isNewLocal: true };
       setMessages((prev) => [...prev, messageWithFlag]);
       
-      const isMe = message.username === username;
-      
-      if (!isMe) {
-        if (document.hasFocus()) {
-          newSocket.emit('readMessage', message.id);
-          readMessagesRef.current.add(message.id);
-        }
-        if (message.type === 'system' && message.action === 'join') {
-          playSound('join');
-        } else if (message.type === 'user') {
-          const now = Date.now();
-          const timeSinceLastMsg = now - lastMessageTimeRef.current;
-          // 5 minutes = 300000 ms
-          if (timeSinceLastMsg >= 300000) {
-            playSound('message');
-          }
-        }
-      }
-      
-      if (message.type === 'user') {
-        lastMessageTimeRef.current = Date.now();
+      if (message.type === 'user' && message.userId !== newSocket.id) {
+        playNotificationSound(); 
       }
     });
 
@@ -425,43 +390,35 @@ export default function App() {
 
     newSocket.on('typing', (typingUsername: string) => {
       setTypingUsers((prev) => {
-        if (!prev.includes(typingUsername)) {
-          return [...prev, typingUsername];
-        }
+        if (!prev.includes(typingUsername)) return [...prev, typingUsername];
         return prev;
       });
     });
 
     newSocket.on('stopTyping', (typingUsername: string) => {
-      setTypingUsers((prev) => prev.filter(u => u !== typingUsername));
-    });
-
-    newSocket.on('messageDeleted', (messageId: string) => {
-      setMessages((prev) => prev.filter(m => m.id !== messageId));
-    });
-
-    newSocket.on('messageEdited', (data: { id: string, text: string }) => {
-      setMessages((prev) => prev.map(m => m.id === data.id ? { ...m, text: data.text, isEdited: true } : m));
+      setTypingUsers((prev) => prev.filter((u) => u !== typingUsername));
     });
 
     newSocket.on('messageRead', ({ messageId, userId }: { messageId: string, userId: string }) => {
-      setMessages((prev) => prev.map(m => {
-        if (m.id === messageId) {
-          const readBy = m.readBy || [];
-          if (!readBy.includes(userId)) {
-            return { ...m, readBy: [...readBy, userId] };
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === messageId) {
+            const readBy = msg.readBy || [];
+            if (!readBy.includes(userId)) {
+              return { ...msg, readBy: [...readBy, userId] };
+            }
           }
-        }
-        return m;
-      }));
+          return msg;
+        })
+      );
     });
 
-    setSocket(newSocket);
+    socketRef.current = newSocket;
 
     return () => {
       newSocket.disconnect();
     };
-  }, [isJoined, username]);
+  }, [isJoined, username, avatar]);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
