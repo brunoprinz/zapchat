@@ -28,7 +28,7 @@ async function startServer() {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    // 1. Lógica de entrada no chat (JOIN)
+    // 1. LÓGICA DE ENTRADA (JOIN)
     socket.on("join", (data: { username: string, avatar: string } | string) => {
       const username = typeof data === 'string' ? data : data.username;
       const avatar = typeof data === 'string' ? '' : data.avatar;
@@ -46,11 +46,11 @@ async function startServer() {
         text: `${username} entrou no chat.`,
         timestamp: Date.now()
       });
-    }); // <-- FECHAMENTO IMPORTANTE AQUI!
+    }); // <-- AQUI TERMINA O JOIN
 
-    // 2. Lógica para apagar mensagens (Fica independente aqui dentro)
+    // 2. LÓGICA DA LIXEIRA (LIMPAR TUDO)
     socket.on("clear_all_messages", (data: { password: string }) => {
-      const ADMIN_PASSWORD = "Bruno"; // Defina sua senha aqui
+      const ADMIN_PASSWORD = "Bruno"; // Você pode mudar para sua senha Wyz... se preferir
       if (data.password === ADMIN_PASSWORD) {
         messages.length = 0; 
         io.emit("messages_cleared");
@@ -58,9 +58,9 @@ async function startServer() {
       } else {
         socket.emit("error_notification", "Senha incorreta!");
       }
-    });
+    }); // <-- AQUI TERMINA A LIXEIRA
 
-    // 3. Lógica de envio de mensagens comum
+    // 3. LÓGICA DE MENSAGENS COMUM
     socket.on("message", (data: { text: string, file?: any }) => {
       const user = users.get(socket.id);
       if (user) {
