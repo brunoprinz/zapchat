@@ -339,7 +339,23 @@
    };
 
    const chamarAtencao = () => {
-    socketRef.current?.emit("send_nudge", { from: username });
+    if (socketRef.current) {
+      socketRef.current.emit("send_nudge", { from: username });
+      
+      // Adiciona uma mensagem de log local só para você ver
+      const systemMessage = {
+        id: Date.now().toString(),
+        text: "🔔 Você chamou a atenção!",
+        sender: "Sistema",
+        timestamp: new Date(),
+        type: 'system' // Se você tiver estilo para mensagens de sistema
+      };
+      
+      // Se o seu estado de mensagens for setMessages:
+      // setMessages(prev => [...prev, systemMessage]);
+      
+      console.log("Sinal enviado com sucesso!");
+    }
   };
  
    useEffect(() => {
