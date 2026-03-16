@@ -349,18 +349,21 @@
      // Use the current origin for the socket connection
      const newSocket = io(window.location.origin);
 
-     socketRef.current.on("receive_nudge", (data) => {
-      // Toca o som
-      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-      audio.play();
+  // IMPORTANTE: Primeiro a gente guarda a conexão no "cofre" (ref)
+  socketRef.current = newSocket;
+  setSocket(newSocket);
+
+  // AGORA você usa o newSocket para ouvir o "chamar atenção"
+  newSocket.on("receive_nudge", (data) => {
+    const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+    audio.play().catch(e => console.log(e));
     
-      // Faz o celular vibrar (funciona bem no Android J7/J8)
-      if (navigator.vibrate) {
-        navigator.vibrate([200, 100, 200]);
-      }
-      
-      alert(`${data.from} está chamando sua atenção!`);
-    });
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
+    
+    alert(`${data.from} está chamando sua atenção!`);
+  });
      
      // Conectamos o "cofre" da lixeira e o "socket" original à nova conexão
      socketRef.current = newSocket;
