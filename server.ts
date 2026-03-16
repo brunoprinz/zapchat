@@ -132,6 +132,11 @@ async function startServer() {
       }
     });
 
+    socket.on("send_nudge", (data) => {
+      // Envia para todos, exceto para quem enviou
+      socket.broadcast.emit("receive_nudge", data);
+    });
+
     socket.on("disconnect", () => {
       const user = users.get(socket.id);
       if (user) {
