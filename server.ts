@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import { createServer as createViteServer } from "vite";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -45,18 +45,15 @@ async function startServer() {
         username: username,
         text: `${username} entrou no chat.`,
         timestamp: Date.now()
-      socket.on("clear_all_messages", () => {
-  messages.length = 0; // Isso esvazia o array mantendo a mesma referência
-  io.emit("messages_cleared"); // Avisa todos os usuários para limparem a tela
-  console.log("O histórico de mensagens foi zerado.");
-});
+      });
     });
 
-
+    // Função para limpar o chat com senha
     socket.on("clear_all_messages", (data: { password?: string }) => {
-      if (data.password === "1234") { 
+      if (data.password === "bruno2026") { 
         messages.length = 0; 
         io.emit("messages_cleared");
+        console.log("O histórico de mensagens foi zerado via admin.");
       } else {
         socket.emit("error_notification", "Senha incorreta!");
       }
