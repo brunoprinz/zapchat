@@ -250,7 +250,7 @@
                    )}
                  </div>
                )}
-               {msg.text && <div className="text-sm break-words whitespace-pre-wrap">{msg.text}</div>}
+               {msg.text && <div className="text-lg font-medium break-words whitespace-pre-wrap">{msg.text}</div>}
                <div className="text-[10px] text-slate-500 mt-1 flex items-center gap-1 justify-end">
                  {msg.isEdited && <span className="italic mr-1">(editado)</span>}
                  {isMe && (
@@ -561,6 +561,55 @@ useEffect(() => {
      return () => document.removeEventListener('mousedown', handleClickOutside);
    }, []);
  
+
+   const exportToHTML = () => {
+    const htmlHead = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Histórico ZapChat - ${username}</title>
+          <style>
+            body { font-family: sans-serif; background: #efeae2; padding: 20px; }
+            .msg { background: white; padding: 10px; margin-bottom: 10px; border-radius: 10px; max-width: 80%; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+            .me { margin-left: auto; background: #dcf8c6; }
+            .user { font-weight: bold; font-size: 0.8em; color: #555; }
+            .time { font-size: 0.7em; color: #999; float: right; }
+            img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
+            audio { margin-top: 5px; width: 100%; }
+          </style>
+        </head>
+        <body>
+          <h2>Histórico de Mensagens</h2>
+    `;
+  
+    const htmlContent = messages.map(msg => {
+      if (msg.type === 'system') return `<p style="text-align:center; color:gray; font-size:0.8em;">${msg.text}</p>`;
+      const isMe = msg.username === username;
+      let media = '';
+      if (msg.file) {
+        if (msg.file.type.startsWith('image/')) media = `<img src="${msg.file.data}" />`;
+        else if (msg.file.type.startsWith('audio/')) media = `<audio controls src="${msg.file.data}"></audio>`;
+        else media = `<p><a href="${msg.file.data}" download="${msg.file.name}">📎 ${msg.file.name}</a></p>`;
+      }
+      return `
+        <div class="msg ${isMe ? 'me' : ''}">
+          <div class="user">${msg.avatar || ''} ${msg.username}</div>
+          <div>${msg.text || ''}</div>
+          ${media}
+          <div class="time">${new Date(msg.timestamp).toLocaleString()}</div>
+        </div>
+      `;
+    }).join('');
+  
+    const fullHTML = htmlHead + htmlContent + '</body></html>';
+    const blob = new Blob([fullHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ZapChat_Historico_${new Date().toLocaleDateString()}.html`;
+    a.click();
+  };
+
    const handleDeleteMessage = (messageId: string) => {
      if (socket) {
        socket.emit('deleteMessage', messageId);
@@ -857,6 +906,13 @@ useEffect(() => {
              >
                <Trash2 className="h-5 w-5" />
              </button>
+             <button
+               onClick={exportToHTML}
+               className="p-2 text-slate-400 hover:text-blue-500 transition-colors mr-1"
+               title="Exportar chat para HTML">
+                <FileText className="h-5 w-5" />
+                </button>
+             
              <button 
                onClick={handleLogout}
                className={`p-2 ${themes[theme].hover} rounded-full transition-colors`}
