@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -165,6 +165,29 @@
      }
      setIsEditing(false);
    };
+
+   // 1. Este busca o que está salvo no celular assim que abre o app
+useEffect(() => {
+  const savedMessages = localStorage.getItem('zapchat_history');
+  if (savedMessages) {
+    try {
+      const parsed = JSON.parse(savedMessages).map((m: any) => ({
+        ...m,
+        timestamp: new Date(m.timestamp) // Converte o texto de volta para data real
+      }));
+      setMessages(parsed);
+    } catch (e) {
+      console.error("Erro ao carregar histórico:", e);
+    }
+  }
+}, []); // <--- O [] vazio é vital aqui!
+
+// 2. Este aqui (você também precisa adicionar) SALVA sempre que houver mensagem nova
+useEffect(() => {
+  if (messages.length > 0) {
+    localStorage.setItem('zapchat_history', JSON.stringify(messages));
+  }
+}, [messages]); // <--- Ele vigia a variável 'messages'
  
    if (isEditing) {
      return (
@@ -326,17 +349,16 @@
    const [showSearch, setShowSearch] = useState(false);
  
  
- const clearChat = () => {
- 
-     const password = window.prompt("Digite a senha de admin:");
- 
-     if (password) {
- 
-       socketRef.current?.emit("clear_all_messages", { password });
- 
-     }
- 
-   };
+   const clearChat = () => {
+    const password = window.prompt("Digite a senha de admin:");
+    if (password) {
+      // Limpa o seu agora
+      localStorage.removeItem('zapchat_history');
+      setMessages([]);
+      // Limpa o de todo mundo (servidor)
+      socketRef.current?.emit("clear_all_messages", { password });
+    }
+  };
 
    const chamarAtencao = () => {
     if (socketRef.current) {
@@ -374,11 +396,18 @@
     const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
     audio.play().catch(e => console.log(e));
     
+    
     if (navigator.vibrate) {
       navigator.vibrate([200, 100, 200]);
     }
     
     alert(`${data.from} está chamando sua atenção!`);
+  });
+
+  // 2. Ouvinte da Limpeza (Gari) - FICAR FORA DO SINO!
+  newSocket.on("all_messages_cleared", () => {
+    localStorage.removeItem('zapchat_history');
+    setMessages([]);
   });
      
      // Conectamos o "cofre" da lixeira e o "socket" original à nova conexão
